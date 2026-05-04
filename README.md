@@ -1,5 +1,3 @@
-Here is the complete, updated Markdown guide. It now includes the electronics setup and your ESP32 Bluetooth control code, complete with explanations so your juniors understand exactly how the software interacts with the hardware. You can drop this straight into your GitHub repository's README.md.
-
 🤖 Heavy-Duty 4WD Sumo Robot Build Guide
 Welcome to the official build guide for our 4WD Sumo Robot. When building a competitive sumo bot—especially one with a heavy, protected tank-shaped chassis—standard motor drivers won't cut it. This guide will walk you through wiring an ESP32 brain with dual high-power BTS7960 motor drivers and uploading the Bluetooth control code to give our robot the massive pushing power it needs.
 
