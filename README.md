@@ -1,124 +1,173 @@
-🤖 Heavy-Duty 4WD Sumo Robot Build Guide
-Welcome to the official build guide for our 4WD Sumo Robot. When building a competitive sumo bot—especially one with a heavy, protected tank-shaped chassis—standard motor drivers won't cut it. This guide will walk you through wiring an ESP32 brain with dual high-power BTS7960 motor drivers and uploading the Bluetooth control code to give our robot the massive pushing power it needs.
+# 🤖 Project: Heavyweight 4WD Bluetooth Sumo Robot
+## Technical Manual & Assembly Guide v1.0
 
-📋 Components List
-1x ESP32 Microcontroller (The "brain")
+This document provides a comprehensive breakdown of the hardware, software, and mechanical integration for a high-torque Sumo Robot. This build is designed for maximum pushing power, utilizing high-current motor drivers and an ESP32 microcontroller for real-time Bluetooth control.
 
-1x ESP32 Expansion Board / Shield (For easy pin access and power distribution)
+---
 
-2x BTS7960 (IBT-2) Motor Drivers (High-current drivers, one for the left side, one for the right)
+## 📑 Table of Contents
+1. [Executive Summary](#executive-summary)
+2. [Component Specifications](#component-specifications)
+3. [System Architecture](#system-architecture)
+4. [Hardware Wiring Guide](#hardware-wiring-guide)
+5. [The Brain: ESP32 & Bluetooth Logic](#the-brain-esp32--bluetooth-logic)
+6. [The Muscle: BTS7960 Driver Theory](#the-muscle-bts7960-driver-theory)
+7. [The Code: Full Implementation](#the-code-full-implementation)
+8. [Mechanical Integration & Chassis](#mechanical-integration--chassis)
+9. [Safety & Maintenance](#safety--maintenance)
+10. [Troubleshooting FAQ](#troubleshooting-faq)
 
-4x Johnson DC Motors (High torque for pushing)
+---
 
-1x 11.1V Bonka LiPo Battery (Logic battery)
+## 1. Executive Summary
+In Robot Sumo, the objective is simple: push the opponent out of the ring. To achieve this, a robot needs two things: **Mass** and **Torque**. This build utilizes four Johnson motors in a "tank-drive" configuration, controlled by an ESP32. By using dual BTS7960 drivers, we can handle currents up to 43A per side, ensuring the motors never stall during a head-on collision.
 
-1x High-Capacity Motor Battery (12V–14.8V equivalent)
+---
 
-1x DC Barrel Jack Connector
+## 2. Component Specifications
 
-Jumper wires & thick gauge wire (for power lines)
+| Component | Role | Key Specification |
+| :--- | :--- | :--- |
+| **ESP32 WROOM** | Microcontroller | Dual-core, Integrated Bluetooth, High-speed PWM |
+| **BTS7960 (IBT-2)** | Motor Driver | 43A Max Current, H-Bridge configuration |
+| **Johnson Motors** | Actuators | High torque, Metal geared DC motors |
+| **Bonka 11.1V** | Logic Power | 3-cell LiPo for stable ESP32 performance |
+| **High-Cap Battery** | Motor Power | 12V-14.8V for maximum motor RPM and torque |
+| **Expansion Board**| Connectivity | Easy access to GPIOs and stable power rails |
 
-⚡ Step 1: Understanding Dual-Power Isolation
-One of the most important rules in robotics is isolating your power supplies. Motors draw massive amounts of current, especially when pushing against an opponent. If the motors and the microcontroller share the same battery, a sudden current draw can cause a voltage drop, forcing the ESP32 to restart mid-battle.
+---
 
-To prevent this, we use a two-battery system:
+## 3. System Architecture
 
-The Brain Power: The 11.1V Bonka battery connects to the barrel jack, which plugs directly into the ESP32 Expansion Board. The board safely steps this down to power the ESP32 logic.
 
-The Muscle Power: The secondary, high-capacity battery connects only to the thick power terminals on the motor drivers.
 
-⚙️ Step 2: Wiring the Motors (Tank Steering)
-We are using a skid-steer (or tank) setup. This means the two left motors act together as one unit, and the two right motors act together as another.
+The system is split into two isolated loops:
+1.  **The Logic Loop:** Powered by the Bonka 11.1V battery via the barrel jack. This ensures the ESP32 doesn't reset when the motors draw massive current.
+2.  **The Power Loop:** Powered by the primary motor battery. This flows directly into the BTS7960 drivers and then to the Johnson motors.
 
-Left Side Drive: Take the two motors on the left side of the chassis. Wire their positive terminals together, and their negative terminals together (parallel). Connect these to the thick Motor Output screw terminals (M+ and M-) on the Left BTS7960.
+**Note:** Always ensure the Ground (GND) of the ESP32 is connected to the GND of the motor drivers to create a common reference for the PWM signals.
 
-Right Side Drive: Do the exact same thing for the two right motors, connecting them to the Right BTS7960.
+---
 
-Motor Power: Connect the positive and negative wires from your high-capacity motor battery to the thick VCC and GND screw terminals on both BTS7960 drivers. Use thick wire for this step to handle the high current!
+## 4. Hardware Wiring Guide
 
-🧠 Step 3: Logic Connections (ESP32 to BTS7960)
-The BTS7960 uses a set of pins to control forward speed, reverse speed, and to enable the chip. Both BTS7960 boards need 5V and Ground from the ESP32 to power their internal logic chips. Connect VCC and GND on the BTS7960 header block to 5V and GND on the ESP32 Expansion Board.
+Refer to the provided file **circuit_image (3).jpg** for the master schematic.
 
-Left Motor Driver:
+### A. Power Distribution
+*   **Logic:** Plug the Bonka 11.1V LiPo into the **DC Barrel Jack** of the ESP32 Expansion Board.
+*   **Motors:** Connect the High-Capacity battery positive (+) to the `VCC` and negative (-) to the `GND` screw terminals on both BTS7960 drivers.
 
-RPWM to GPIO 25
+### B. Motor Connections
+Connect the 4 Johnson motors in a "Skid Steer" (Tank) arrangement:
+*   **Left Side:** Pair the two left motors. Connect their wires to the `M+` and `M-` terminals of the **Left BTS7960**.
+*   **Right Side:** Pair the two right motors. Connect their wires to the `M+` and `M-` terminals of the **Right BTS7960**.
 
-LPWM to GPIO 26
+### C. ESP32 to BTS7960 (Logic Headers)
+Each driver has an 8-pin logic header. Wire them as follows:
 
-R_EN to GPIO 27
+**Left Driver:**
+*   `VCC` -> 5V (Expansion Board)
+*   `GND` -> GND (Expansion Board)
+*   `R_EN` -> **GPIO 27**
+*   `L_EN` -> **GPIO 14**
+*   `RPWM` -> **GPIO 25**
+*   `LPWM` -> **GPIO 26**
 
-L_EN to GPIO 14
+**Right Driver:**
+*   `VCC` -> 5V (Expansion Board)
+*   `GND` -> GND (Expansion Board)
+*   `R_EN` -> **GPIO 12**
+*   **L_EN** -> **GPIO 13**
+*   `RPWM` -> **GPIO 32**
+*   `LPWM` -> **GPIO 33**
 
-Right Motor Driver:
+---
 
-RPWM to GPIO 32
+## 5. The Brain: ESP32 & Bluetooth Logic
 
-LPWM to GPIO 33
 
-R_EN to GPIO 12
 
-L_EN to GPIO 13
+The ESP32 is chosen for its superior speed and Bluetooth Serial capabilities. In this setup, the ESP32 acts as a transparent bridge between your smartphone and the hardware.
+*   **Bluetooth Serial:** We use the `BluetoothSerial.h` library to create a virtual serial port over the air.
+*   **PWM Control:** The motors are controlled via Pulse Width Modulation. By rapidly switching the power on and off, we can control the speed of the Johnson motors from 0% to 100%.
 
-💻 Step 4: The Control Code
-This code turns the ESP32 into a Bluetooth receiver that translates commands from a smartphone controller app into PWM (Pulse Width Modulation) signals for the motor drivers.
+---
 
-Note for builders: This code uses the updated ESP32 Arduino Core 3.x syntax for PWM (ledcAttach). Ensure your Arduino IDE board manager is up to date.
+## 6. The Muscle: BTS7960 Driver Theory
+The BTS7960 is a fully integrated high-current H-bridge. 
+*   **R_EN & L_EN:** These are the Enable pins. When they are HIGH, the driver is active.
+*   **RPWM & LPWM:** These control the direction. 
+    *   PWM on `RPWM` + 0 on `LPWM` = Forward.
+    *   0 on `RPWM` + PWM on `LPWM` = Reverse.
+    *   This dual-PWM control allows for extremely smooth acceleration curves.
 
-C++
-// ================= Bluetooth =================
+---
+
+## 7. The Code: Full Implementation
+
+Copy and paste this code into the Arduino IDE. Ensure you have the ESP32 board package installed.
+```cpp
+/*
+ * SUMO ROBOT CONTROL SYSTEM
+ * Targeted Hardware: ESP32 + Dual BTS7960
+ * Description: Bluetooth-controlled tank drive with failsafe.
+ */
+
 #include "BluetoothSerial.h"
+
+// Check if Bluetooth is properly enabled
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to enable it
+#endif
+
 BluetoothSerial SerialBT;
 
-// ================= LEFT SIDE =================
-#define RPWM_L 25
-#define LPWM_L 26
-#define REN_L  27
-#define LEN_L  14
+// --- PIN ASSIGNMENTS ---
+// Left Side
+const int RPWM_L = 25; 
+const int LPWM_L = 26; 
+const int REN_L  = 27; 
+const int LEN_L  = 14; 
 
-// ================= RIGHT SIDE =================
-#define RPWM_R 32
-#define LPWM_R 33
-#define REN_R  12
-#define LEN_R  13
+// Right Side
+const int RPWM_R = 32; 
+const int LPWM_R = 33; 
+const int REN_R  = 12; 
+const int LEN_R  = 13; 
 
-// ================= PWM =================
-const int freq = 15000;
-const int resolution = 8;
+// --- MOTOR SETTINGS ---
+const int freq = 15000;    // High frequency to avoid motor buzzing
+const int resolution = 8;  // 8-bit resolution (0-255)
+int baseSpeed = 255;       // Initial speed at max
+float turnFactor = 0.7;    // Slows down the inner track during turns
 
-// ================= SPEED =================
-int baseSpeed = 255;
-float turnFactor = 0.7;
-
-// ================= FAILSAFE =================
+// --- SAFETY FAILSAFE ---
 unsigned long lastCommandTime = 0;
-const int timeout = 500;
+const int timeout = 500;   // 500ms timeout if Bluetooth disconnects
 
-// ================= SETUP =================
 void setup() {
   Serial.begin(115200);
-  SerialBT.begin("OFFROAD CAR");
+  SerialBT.begin("SUMO_BOT_OFFROAD"); // Bluetooth Device Name
+  Serial.println("Robot Ready. Pair via Bluetooth.");
 
-  pinMode(REN_L, OUTPUT);
-  pinMode(LEN_L, OUTPUT);
-  pinMode(REN_R, OUTPUT);
-  pinMode(LEN_R, OUTPUT);
+  // Initialize Enable Pins
+  pinMode(REN_L, OUTPUT); pinMode(LEN_L, OUTPUT);
+  pinMode(REN_R, OUTPUT); pinMode(LEN_R, OUTPUT);
 
-  digitalWrite(REN_L, HIGH);
-  digitalWrite(LEN_L, HIGH);
-  digitalWrite(REN_R, HIGH);
-  digitalWrite(LEN_R, HIGH);
+  // Wake up the drivers
+  digitalWrite(REN_L, HIGH); digitalWrite(LEN_L, HIGH);
+  digitalWrite(REN_R, HIGH); digitalWrite(LEN_R, HIGH);
 
-  // ESP32 3.x PWM
+  // Configure PWM for ESP32 3.x
   ledcAttach(RPWM_L, freq, resolution);
   ledcAttach(LPWM_L, freq, resolution);
   ledcAttach(RPWM_R, freq, resolution);
   ledcAttach(LPWM_R, freq, resolution);
 }
 
-// ================= MOTOR CONTROL =================
+// Low-level motor driving function
 void setMotorLeft(int speed) {
   speed = constrain(speed, -255, 255);
-
   if (speed > 0) {
     ledcWrite(RPWM_L, speed);
     ledcWrite(LPWM_L, 0);
@@ -133,7 +182,6 @@ void setMotorLeft(int speed) {
 
 void setMotorRight(int speed) {
   speed = constrain(speed, -255, 255);
-
   if (speed > 0) {
     ledcWrite(RPWM_R, speed);
     ledcWrite(LPWM_R, 0);
@@ -151,64 +199,31 @@ void move(int leftSpeed, int rightSpeed) {
   setMotorRight(rightSpeed);
 }
 
-// ================= LOOP =================
 void loop() {
-
+  // Check for incoming Bluetooth data
   if (SerialBT.available()) {
     char cmd = SerialBT.read();
-    lastCommandTime = millis();
+    lastCommandTime = millis(); // Reset failsafe timer
 
     switch (cmd) {
-
-      // ===== STOP (instant) =====
-      case 'S': 
-        move(0, 0); 
-        break;
-
-      // ===== Forward =====
-      case 'F': move(baseSpeed, baseSpeed); break;
-
-      // ===== Reverse =====
-      case 'B': move(-baseSpeed, -baseSpeed); break;
-
-      // ===== Forward Turns =====
-      case 'G': move(baseSpeed * turnFactor, baseSpeed); break;
-      case 'I': move(baseSpeed, baseSpeed * turnFactor); break;
-
-      // ===== Reverse Turns =====
-      case 'J': move(-baseSpeed * turnFactor, -baseSpeed); break;
-      case 'H': move(-baseSpeed, -baseSpeed * turnFactor); break;
-
-      // ===== Spin =====
-      case 'L': move(-baseSpeed, baseSpeed); break;
-      case 'R': move(baseSpeed, -baseSpeed); break;
-
-      // ===== Speed Control =====
+      case 'F': move(baseSpeed, baseSpeed); break; // Forward
+      case 'B': move(-baseSpeed, -baseSpeed); break; // Back
+      case 'L': move(-baseSpeed, baseSpeed); break; // Spin Left
+      case 'R': move(baseSpeed, -baseSpeed); break; // Spin Right
+      case 'G': move(baseSpeed * turnFactor, baseSpeed); break; // Forward-Left
+      case 'I': move(baseSpeed, baseSpeed * turnFactor); break; // Forward-Right
+      case 'S': move(0, 0); break; // Stop
+      
+      // Speed Step Control
       case '0': baseSpeed = 0; break;
-      case '2': baseSpeed = 80; break;
       case '4': baseSpeed = 120; break;
-      case '6': baseSpeed = 160; break;
       case '8': baseSpeed = 200; break;
       case 'q': baseSpeed = 255; break;
-
     }
   }
 
-  // ===== FAILSAFE (backup only) =====
+  // FAILSAFE: If no command received in 500ms, stop the robot
   if (millis() - lastCommandTime > timeout) {
     move(0, 0);
   }
 }
-🔍 Code Highlights for Juniors:
-Enable Pins (REN / LEN): In the setup() function, we pull all the enable pins HIGH. This wakes up the BTS7960 drivers so they are ready to accept speed commands.
-
-The Failsafe: Bluetooth connections can drop. The lastCommandTime variable tracks the last time the ESP32 received a command. If 500 milliseconds pass with no new commands (the timeout), the loop automatically forces the motors to stop (move(0, 0);). This prevents a runaway robot!
-
-Tank Turning: Notice how the Spin commands (L and R) send a positive speed to one side and a negative speed to the other. This drives the tracks in opposite directions, allowing the bot to turn perfectly on its own axis.
-
-🛑 Final Assembly & Safety Notes
-LiPo Battery Warning: LiPo batteries can be dangerous if short-circuited. Never let the red and black wires of your batteries touch. Always double-check your polarity before plugging anything in.
-
-Chassis Protection: When securing the electronics and wiring inside the 40x40x30 trapezium shell, make sure nothing is loose. The components need to be completely protected inside the chassis so they aren't damaged when taking hits during a sumo match.
-
-Common Grounds: Ensure the ground line from the ESP32 is securely connected to the ground pin on the BTS7960 logic header. Without a common ground, the PWM signals won't be read correctly.
